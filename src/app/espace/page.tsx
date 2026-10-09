@@ -1,7 +1,5 @@
-'use client';
-
-import { ProApp } from '@/components/doctori/pro/ProApp';
+import { redirect } from 'next/navigation';
 
 export default function EspacePage() {
-  return <ProApp />;
+  redirect('/');
 }

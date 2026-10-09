@@ -45,9 +45,18 @@ export interface Booking {
 
 export type Sex = 'F' | 'M';
 
-export type VisitFlow = 'a_venir' | 'en_cours' | 'termine' | 'absent' | 'annule';
+export type VisitFlow = 'a_venir' | 'arrive' | 'en_cours' | 'termine' | 'absent' | 'annule';
 
 export type PayState = 'paye' | 'impaye' | 'partiel';
+
+export type PayMethod = 'especes' | 'carte';
+
+export interface PrescriptionLine {
+  medicine: string;
+  dose: string;
+  times: string;
+  days: string;
+}
 
 export interface ClinicPatient {
   id: string;
@@ -74,4 +83,14 @@ export interface Consult {
   discount: number;
   paid: number;
   note: string;
+  bookingId?: string;
+  remindedEve?: boolean;
+  remindedSoon?: boolean;
+  prescription?: string;
+  prescriptionLines?: PrescriptionLine[];
+  certificate?: string;
+  tension?: string;
+  weight?: string;
+  temperature?: string;
+  payMethod?: PayMethod;
 }

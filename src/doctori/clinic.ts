@@ -1,14 +1,38 @@
 import type { ClinicPatient, Consult, PayState, VisitType } from './types';
+import { DOCTORS } from './data';
+
+function doctorMail(id: string) {
+  if (id === 'amal-bennani') return 'amal@doctori.ma';
+  if (id === 'youssef-el-idrissi') return 'youssef@doctori.ma';
+  return `${id}@doctori.ma`;
+}
+
+function secretaryMail(id: string) {
+  if (id === 'amal-bennani') return 'secretaire@doctori.ma';
+  return `sec.${id}@doctori.ma`;
+}
 
 export const ACCOUNTS = [
-  { email: 'amal@doctori.ma', password: 'doctori', role: 'medecin' as const, doctorId: 'amal-bennani', label: 'Dr Amal Bennani' },
-  { email: 'youssef@doctori.ma', password: 'doctori', role: 'medecin' as const, doctorId: 'youssef-el-idrissi', label: 'Dr Youssef El Idrissi' },
-  { email: 'secretaire@doctori.ma', password: 'doctori', role: 'secretaire' as const, doctorId: '', label: 'Secrétariat' },
+  ...DOCTORS.map((doctor) => ({
+    email: doctorMail(doctor.id),
+    password: 'doctori',
+    role: 'medecin' as const,
+    doctorId: doctor.id,
+    label: doctor.name,
+  })),
+  ...DOCTORS.map((doctor) => ({
+    email: secretaryMail(doctor.id),
+    password: 'doctori',
+    role: 'secretaire' as const,
+    doctorId: doctor.id,
+    label: `Secrétariat · ${doctor.name}`,
+  })),
 ];
 
 export const FLOW_LABEL = {
   a_venir: 'À venir',
-  en_cours: 'En cours',
+  arrive: 'Arrivé',
+  en_cours: 'En consultation',
   termine: 'Terminé',
   absent: 'Absent',
   annule: 'Annulé',

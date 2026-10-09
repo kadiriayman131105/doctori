@@ -1,6 +1,6 @@
 'use client';
 
-import { Pencil, Trash2, X } from 'lucide-react';
+import { Pencil, Plus, Trash2, X } from 'lucide-react';
 
 export function ConfirmDialog({
   open,
@@ -12,7 +12,7 @@ export function ConfirmDialog({
   onCancel,
 }: {
   open: boolean;
-  tone: 'edit' | 'danger';
+  tone: 'edit' | 'danger' | 'add';
   title: string;
   text: string;
   confirmLabel: string;
@@ -21,7 +21,7 @@ export function ConfirmDialog({
 }) {
   if (!open) return null;
   const danger = tone === 'danger';
-  const Icon = danger ? Trash2 : Pencil;
+  const Icon = danger ? Trash2 : tone === 'add' ? Plus : Pencil;
 
   return (
     <div className="fixed inset-0 z-50 grid place-items-center bg-fb-ink/40 p-4" role="presentation" onClick={onCancel}>
@@ -32,7 +32,7 @@ export function ConfirmDialog({
         className="w-full max-w-md rounded-3xl bg-white p-6 shadow-xl"
         onClick={(event) => event.stopPropagation()}
       >
-        <div className={`grid h-12 w-12 place-items-center rounded-2xl ${danger ? 'bg-red-50 text-red-600' : 'bg-fb-soft text-fb'}`}>
+        <div className={`grid h-12 w-12 place-items-center rounded-2xl ${danger ? 'bg-red-50 text-red-600' : tone === 'add' ? 'bg-green-50 text-fb-green' : 'bg-fb-soft text-fb'}`}>
           <Icon size={22} />
         </div>
         <h2 id="confirm-title" className="mt-4 text-xl font-bold">
@@ -47,7 +47,7 @@ export function ConfirmDialog({
           <button
             type="button"
             onClick={onConfirm}
-            className={`inline-flex h-11 items-center gap-1 rounded-xl px-4 text-sm font-bold text-white ${danger ? 'bg-red-600' : 'bg-fb'}`}
+            className={`inline-flex h-11 items-center gap-1 rounded-xl px-4 text-sm font-bold text-white ${danger ? 'bg-red-600' : tone === 'add' ? 'bg-fb-green' : 'bg-fb'}`}
           >
             <Icon size={16} />
             {confirmLabel}

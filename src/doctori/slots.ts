@@ -8,6 +8,11 @@ export interface SlotOptions {
   busyStarts?: string[];
 }
 
+export function bookingSlotId(doctorId: string, start: string, visitType: VisitType) {
+  const base = slotId(doctorId, new Date(start));
+  return visitType === 'cabinet' ? base : `${base}-${visitType}`;
+}
+
 export function slotId(doctorId: string, date: Date) {
   const y = date.getFullYear();
   const m = String(date.getMonth() + 1).padStart(2, '0');

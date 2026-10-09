@@ -1,8 +1,8 @@
 # Doctori
 
-Annuaire et prise de rendez-vous pour des cabinets de Casablanca. Interface en français. Les médecins et les patients sont fictifs : c’est une démo qui tourne dans le navigateur, sans serveur métier.
+Logiciel de cabinet médical, en français. Un médecin achète son bureau. Son secrétariat travaille sur le **même agenda**. Les patients n’ont pas de compte et ne prennent pas rendez-vous eux-mêmes.
 
-Les patients n’ont pas de compte. Seuls le médecin et la secrétaire se connectent. Rendez-vous, fiches, horaires et modifications de profil restent dans le `localStorage` de ce navigateur. Un autre ordinateur, ou un autre navigateur, repart des données de démonstration.
+C’est une démonstration : médecins fictifs, tout reste dans le `localStorage` de ce navigateur. Pas encore de Mongo. Un autre ordinateur ou un autre navigateur repart des données d’exemple.
 
 ## Lancer
 
@@ -11,37 +11,70 @@ npm install
 npm run dev
 ```
 
-Ouvrir [http://localhost:3000](http://localhost:3000).
-
-## Comptes de démo
-
-Mot de passe pour les trois : `doctori`
-
-| Rôle | E-mail |
-| --- | --- |
-| Dr Amal Bennani, généraliste, Maarif | `amal@doctori.ma` |
-| Dr Youssef El Idrissi, cardiologue, Racine | `youssef@doctori.ma` |
-| Secrétariat | `secretaire@doctori.ma` |
-
-Le bouton **Espace médecin** n’apparaît que hors de l’espace. Une fois connecté, le médecin voit **Mon profil**. **Basculer vers secrétaire** / **Basculer vers médecin** change la vue sans déconnexion.
-
-## Parcours
-
-**Public.** Recherche par nom, spécialité ou quartier. Filtres cabinet, vidéo, domicile, aujourd’hui, CNSS, CNOPS, mutuelle. La fiche montre le tarif, le diplôme et un agenda de créneaux libres. La confirmation ouvre WhatsApp.
-
-**Médecin.** Tableau de bord, agenda, patients, facturation. Historique d’un patient et programmation d’un contrôle. Le profil (photo, diplôme, tarif, adresse, langues) se reflète sur la carte d’accueil et la fiche publique. Les horaires, la pause et les jours bloqués limitent les créneaux publics.
-
-**Secrétariat.** Agenda de tout le cabinet, création et déplacement de rendez-vous, patients, prix, médecin assigné. Recherche par numéro de téléphone, prochain rendez-vous, rappel WhatsApp en un bouton. Une absence se bloque en un clic.
-
-Un créneau déjà pris demande confirmation avant d’être doublé. Modifier ou supprimer demande aussi confirmation.
-
-Le détail des gestes est aussi dans l’application, page **Comment faire**.
-
-## Pile
-
-Next.js 15, React 19, TypeScript, Tailwind CSS, FullCalendar, lucide-react.
+Ouvrir [http://localhost:3000](http://localhost:3000). La page d’accueil est la connexion.
 
 ```bash
 npm run build
 npm start
 ```
+
+## Comptes de démo
+
+Mot de passe partout : `doctori`
+
+| Qui | E-mail |
+| --- | --- |
+| Dr Amal Bennani | `amal@doctori.ma` |
+| Secrétariat d’Amal | `secretaire@doctori.ma` |
+| Dr Youssef El Idrissi | `youssef@doctori.ma` |
+| Secrétariat de Youssef | `sec.youssef-el-idrissi@doctori.ma` |
+
+Les autres médecins du jeu suivent le même schéma : `{identifiant}@doctori.ma` et `sec.{identifiant}@doctori.ma`. Exemple : `sara-tazi@doctori.ma`.
+
+Dans la barre du haut, **Secrétariat** / **Médecin** change de vue **sans** se déconnecter. On reste sur le même médecin.
+
+## Bureau
+
+La barre (survol sur ordinateur, clic sur téléphone) ouvre les écrans.
+
+**Médecin** — Cabinet : tableau de bord, rendez-vous, patients. Gestion : facturation, documents. Le nom ouvre le profil et la sortie.
+
+**Secrétariat** — Accueil : salle d’attente, rappels. Planning : agenda, patients, liste d’attente. Gestion : facturation, caisse du jour, documents.
+
+On cherche un patient par **nom ou téléphone**. Un numéro déjà connu ouvre la fiche existante au lieu d’en créer une deuxième.
+
+## Confirmations
+
+| Action | Interface |
+| --- | --- |
+| Supprimer, annuler un RDV, clôturer la caisse, jours fériés | Pop-up *Voulez-vous vraiment* |
+| Encaisser | Pop-up (argent) |
+| Chevauchement de créneau | Pop-up *Continuer quand même* |
+| Note, constantes, Arrivé, petite fiche | Toast vert **Enregistré** (2 s, **Annuler** si c’est réversible) |
+
+## Agenda et visite
+
+Filtrer avec **Du** / **Au**. Un rendez-vous déplacé hors de l’intervalle recentre le calendrier.
+
+Sur une visite : tension, poids, température, note, remise, paiement. **Contrôle dans 15 jours** pose le prochain créneau (même heure ; jour ouvré suivant si le cabinet est fermé).
+
+**Jours fériés 2026** : menu en tête de Rendez-vous. On coche, puis **Appliquer la sélection**. Le secrétariat ne ferme que les jours de son médecin.
+
+## Documents et caisse
+
+Facture, ordonnance (un médicament par ligne), certificat, feuille de soins. **Enregistrer sur la fiche** les lie au rendez-vous. **Documents enregistrés** les retrouve sur la fiche patient.
+
+La caisse du jour sépare espèces, carte et reste dû, puis clôture. La liste d’attente sert à rappeler quelqu’un dès qu’un créneau se libère.
+
+Les rappels WhatsApp ouvrent **wa.me** avec le texte déjà écrit. Pas d’API payante.
+
+## Sauvegardes (avant Mongo)
+
+- **Sauvegarde du jour** : JSON ou PDF des visites d’aujourd’hui.
+- **Sauvegarde du cabinet** : JSON de tout (patients, RDV, horaires, caisse, liste d’attente, profil). **Importer** remplace les données de ce navigateur (confirmation).
+
+Vider le cache du navigateur efface le cabinet si aucune copie n’a été exportée.
+
+## Pile
+
+Next.js 15, React 19, TypeScript, Tailwind CSS, Bootstrap 5 (barre de navigation), FullCalendar, lucide-react.

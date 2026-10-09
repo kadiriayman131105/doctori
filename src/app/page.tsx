@@ -1,13 +1,12 @@
-import { ServiceCarousel } from '@/components/doctori/ServiceCarousel';
-import { Finder } from '@/components/doctori/Finder';
+'use client';
 
-export const dynamic = 'force-dynamic';
+import { LoginScreen } from '@/components/doctori/LoginScreen';
+import { ProApp } from '@/components/doctori/pro/ProApp';
+import { useClinic } from '@/doctori/clinic-store';
 
 export default function HomePage() {
-  return (
-    <main>
-      <ServiceCarousel />
-      <Finder />
-    </main>
-  );
+  const clinic = useClinic();
+  if (!clinic.ready) return <p className="px-4 py-16 text-center text-fb-muted">Ouverture du cabinet…</p>;
+  if (!clinic.role) return <LoginScreen />;
+  return <ProApp />;
 }

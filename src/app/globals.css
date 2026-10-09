@@ -63,6 +63,27 @@ body {
   border-color: #e4e6eb;
 }
 
+@media print {
+  body.doctori-printing * {
+    visibility: hidden;
+  }
+  body.doctori-printing .doctori-receipt,
+  body.doctori-printing .doctori-receipt *,
+  body.doctori-printing .doctori-print,
+  body.doctori-printing .doctori-print * {
+    visibility: visible;
+  }
+  body.doctori-printing .doctori-receipt,
+  body.doctori-printing .doctori-print {
+    display: block !important;
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+    box-shadow: none;
+  }
+}
+
 .doctori-cal .fc-col-header-cell-cushion,
 .doctori-cal .fc-timegrid-slot-label-cushion {
   color: #65676b;

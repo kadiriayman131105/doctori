@@ -6,6 +6,8 @@ import { DAY_NAMES, type DayHours, type WeekHours } from '@/doctori/hours';
 import { useHours } from '@/doctori/hours-store';
 import { useProfiles } from '@/doctori/profiles';
 import { ConfirmDialog } from './ConfirmDialog';
+import { HolidayButton } from './HolidayButton';
+import { useToast } from './Toast';
 
 export function HoursEditor({ doctorId }: { doctorId: string }) {
   const hours = useHours();
@@ -14,7 +16,8 @@ export function HoursEditor({ doctorId }: { doctorId: string }) {
   const [draft, setDraft] = useState<WeekHours>(savedWeek);
   const [day, setDay] = useState('');
   const [note, setNote] = useState('');
-  const [confirm, setConfirm] = useState(false);
+  const [dayAsk, setDayAsk] = useState<{ day: string; blocked: boolean } | null>(null);
+  const toast = useToast();
 
   useEffect(() => {
     setDraft(savedWeek);
@@ -51,7 +54,15 @@ export function HoursEditor({ doctorId }: { doctorId: string }) {
           </li>
         ))}
       </ul>
-      <button type="button" onClick={() => setConfirm(true)} className="mt-4 h-11 rounded-xl bg-fb px-4 font-bold text-white">
+      <button
+        type="button"
+        onClick={() => {
+          hours.saveWeek(doctorId, draft);
+          toast.show('Enregistré');
+          setNote('Horaires enregistrés.');
+        }}
+        className="mt-4 h-11 rounded-xl bg-fb px-4 font-bold text-white"
+      >
         Enregistrer les horaires
       </button>
       {note ? <p className="mt-2 text-sm font-bold text-fb-green">{note}</p> : null}
@@ -67,10 +78,7 @@ export function HoursEditor({ doctorId }: { doctorId: string }) {
           <button
             type="button"
             disabled={!day}
-            onClick={() => {
-              const blocked = hours.toggleClosed(doctorId, day);
-              setNote(blocked ? `${day} est bloqué.` : `${day} est de nouveau ouvert.`);
-            }}
+            onClick={() => setDayAsk({ day, blocked: closed.includes(day) })}
             className="h-11 rounded-xl bg-fb-deep px-4 text-sm font-bold text-white disabled:opacity-40"
           >
             {day && closed.includes(day) ? 'Rouvrir ce jour' : 'Bloquer ce jour'}
@@ -82,10 +90,7 @@ export function HoursEditor({ doctorId }: { doctorId: string }) {
               <li key={item}>
                 <button
                   type="button"
-                  onClick={() => {
-                    hours.toggleClosed(doctorId, item);
-                    setNote(`${item} est de nouveau ouvert.`);
-                  }}
+                  onClick={() => setDayAsk({ day: item, blocked: true })}
                   className="rounded-full bg-red-50 px-3 py-1 text-sm font-bold text-red-700"
                 >
                   {item} · rouvrir
@@ -96,57 +101,90 @@ export function HoursEditor({ doctorId }: { doctorId: string }) {
         ) : null}
       </div>
 
+      <HolidayButton doctorId={doctorId} />
       <ConfirmDialog
-        open={confirm}
+        open={Boolean(dayAsk)}
         tone="edit"
         title="Voulez-vous vraiment modifier ?"
-        text="Les créneaux publics suivront ces jours, ces horaires et ces pauses."
-        confirmLabel="Oui, modifier"
-        onCancel={() => setConfirm(false)}
+        text={
+          dayAsk
+            ? dayAsk.blocked
+              ? `Le ${dayAsk.day} sera de nouveau ouvert aux rendez-vous.`
+              : `Le ${dayAsk.day} sera bloqué. Les créneaux publics de ce jour disparaissent.`
+            : ''
+        }
+        confirmLabel={dayAsk?.blocked ? 'Oui, rouvrir' : 'Oui, bloquer'}
+        onCancel={() => setDayAsk(null)}
         onConfirm={() => {
-          hours.saveWeek(doctorId, draft);
-          setNote('Horaires enregistrés.');
-          setConfirm(false);
+          if (!dayAsk) return;
+          const blocked = hours.toggleClosed(doctorId, dayAsk.day);
+          setNote(blocked ? `${dayAsk.day} est bloqué.` : `${dayAsk.day} est de nouveau ouvert.`);
+          setDayAsk(null);
         }}
       />
     </section>
   );
 }
 
-export function AbsenceBar() {
+export function AbsenceBar({ doctorId: lockedDoctorId }: { doctorId?: string }) {
   const hours = useHours();
   const profiles = useProfiles();
-  const [doctorId, setDoctorId] = useState(profiles.doctors[0]?.id ?? 'amal-bennani');
+  const [doctorId, setDoctorId] = useState(lockedDoctorId ?? profiles.doctors[0]?.id ?? 'amal-bennani');
   const [day, setDay] = useState('');
   const [note, setNote] = useState('');
+  const [dayAsk, setDayAsk] = useState(false);
   const closed = hours.closed(doctorId);
+
+  useEffect(() => {
+    if (lockedDoctorId) setDoctorId(lockedDoctorId);
+  }, [lockedDoctorId]);
+  const already = Boolean(day && closed.includes(day));
 
   return (
     <section className="mb-4 rounded-2xl bg-white p-4 ring-1 ring-fb-line">
       <p className="text-sm font-bold">Bloquer une absence</p>
       <div className="mt-2 flex flex-wrap items-center gap-2">
-        <select value={doctorId} onChange={(event) => setDoctorId(event.target.value)} className="h-11 rounded-xl border border-fb-line px-3 text-sm font-bold">
-          {profiles.doctors.map((doctor) => (
-            <option key={doctor.id} value={doctor.id}>
-              {doctor.name}
-            </option>
-          ))}
-        </select>
+        {lockedDoctorId ? (
+          <p className="flex h-11 items-center rounded-xl bg-fb-bg px-3 text-sm font-bold">{profiles.doctor(lockedDoctorId)?.name}</p>
+        ) : (
+          <select value={doctorId} onChange={(event) => setDoctorId(event.target.value)} className="h-11 rounded-xl border border-fb-line px-3 text-sm font-bold">
+            {profiles.doctors.map((doctor) => (
+              <option key={doctor.id} value={doctor.id}>
+                {doctor.name}
+              </option>
+            ))}
+          </select>
+        )}
         <input type="date" value={day} onChange={(event) => setDay(event.target.value)} className="h-11 rounded-xl border border-fb-line px-3" />
         <button
           type="button"
           disabled={!day}
-          onClick={() => {
-            const blocked = hours.toggleClosed(doctorId, day);
-            const name = profiles.doctor(doctorId)?.name ?? 'Ce médecin';
-            setNote(blocked ? `${name} est absent le ${day}.` : `${name} reprend le ${day}.`);
-          }}
+          onClick={() => setDayAsk(true)}
           className="h-11 rounded-xl bg-fb-deep px-4 text-sm font-bold text-white disabled:opacity-40"
         >
           {day && closed.includes(day) ? 'Rouvrir ce jour' : 'Bloquer ce jour'}
         </button>
       </div>
       {note ? <p className="mt-2 text-sm font-bold text-fb-green">{note}</p> : null}
+      <HolidayButton doctorId={doctorId} />
+      <ConfirmDialog
+        open={dayAsk}
+        tone="edit"
+        title="Voulez-vous vraiment modifier ?"
+        text={
+          already
+            ? `${profiles.doctor(doctorId)?.name ?? 'Ce médecin'} reprendra le ${day}.`
+            : `${profiles.doctor(doctorId)?.name ?? 'Ce médecin'} sera absent le ${day}.`
+        }
+        confirmLabel={already ? 'Oui, rouvrir' : 'Oui, bloquer'}
+        onCancel={() => setDayAsk(false)}
+        onConfirm={() => {
+          const blocked = hours.toggleClosed(doctorId, day);
+          const name = profiles.doctor(doctorId)?.name ?? 'Ce médecin';
+          setNote(blocked ? `${name} est absent le ${day}.` : `${name} reprend le ${day}.`);
+          setDayAsk(false);
+        }}
+      />
     </section>
   );
 }

@@ -1,5 +1,6 @@
 'use client';
 
+import { useEffect, useRef } from 'react';
 import FullCalendar from '@fullcalendar/react';
 import interactionPlugin from '@fullcalendar/interaction';
 import timeGridPlugin from '@fullcalendar/timegrid';
@@ -8,6 +9,7 @@ import type { ClinicPatient, Consult, VisitFlow } from '@/doctori/types';
 
 const COLOR: Record<VisitFlow, string> = {
   a_venir: '#1877F2',
+  arrive: '#0E8A7D',
   en_cours: '#F7B928',
   termine: '#31A24C',
   absent: '#8A8D91',
@@ -25,6 +27,8 @@ export function ClinicCalendar({
   onMove,
   onSelect,
   onCreate,
+  focusDate,
+  bounds,
 }: {
   consults: Consult[];
   patients: ClinicPatient[];
@@ -32,10 +36,21 @@ export function ClinicCalendar({
   onMove: (id: string, start: string) => void;
   onSelect: (id: string) => void;
   onCreate?: (start: string) => void;
+  focusDate?: string;
+  bounds?: { start?: string; end?: string };
 }) {
+  const calendarRef = useRef<FullCalendar>(null);
+
+  useEffect(() => {
+    if (!focusDate) return;
+    calendarRef.current?.getApi().gotoDate(focusDate);
+  }, [focusDate]);
+
   return (
     <div className="doctori-cal rounded-2xl bg-white p-3 ring-1 ring-fb-line">
       <FullCalendar
+        ref={calendarRef}
+        validRange={bounds}
         plugins={[timeGridPlugin, interactionPlugin]}
         initialView="timeGridWeek"
         locale={frLocale}

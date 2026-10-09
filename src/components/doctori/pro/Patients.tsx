@@ -10,6 +10,9 @@ import { formatWhen } from '@/doctori/slots';
 import { billed, dueAmount, payState } from './money';
 import { PAY_LABEL } from '@/doctori/clinic';
 import { ConfirmDialog } from './ConfirmDialog';
+import { useToast } from './Toast';
+import { findByPhone, matchesPatient } from '@/doctori/phone';
+import { PatientDocs } from './PatientDocs';
 
 export function Patients({
   patients,
@@ -19,24 +22,26 @@ export function Patients({
   onCreate,
   doctorId,
   focusId,
+  onDocument,
 }: {
   patients: ClinicPatient[];
   consults: Consult[];
   onPatient: (id: string, patch: Partial<ClinicPatient>) => void;
-  onAdd: (input: Omit<Consult, 'id'>) => void;
+  onAdd: (input: Omit<Consult, 'id'>) => string | void;
   onCreate?: (input: Omit<ClinicPatient, 'id'>) => string;
   doctorId?: string;
   focusId?: string | null;
+  onDocument?: (patientId: string, consultId?: string, kind?: 'facture' | 'ordonnance' | 'certificat' | 'feuille') => void;
 }) {
   const [query, setQuery] = useState('');
   const [sex, setSex] = useState<Sex | ''>('');
   const [selected, setSelected] = useState<string | null>(focusId || patients[0]?.id || null);
   const [visitType, setVisitType] = useState<VisitType>('cabinet');
   const [booked, setBooked] = useState('');
-  const [clash, setClash] = useState<{ text: string; run: () => void } | null>(null);
+  const [ask, setAsk] = useState<{ tone: 'edit' | 'add'; title: string; text: string; confirm: string; run: () => void } | null>(null);
   const [creating, setCreating] = useState(false);
-  const [askSave, setAskSave] = useState<Partial<ClinicPatient> | null>(null);
   const profiles = useProfiles();
+  const toast = useToast();
 
   useEffect(() => {
     if (focusId) setSelected(focusId);
@@ -47,7 +52,7 @@ export function Patients({
     return patients.filter((patient) => {
       if (sex && patient.sex !== sex) return false;
       if (!needle) return true;
-      return `${patient.name} ${patient.conditions} ${patient.notes}`.toLowerCase().includes(needle);
+      return matchesPatient(patient, query);
     });
   }, [patients, query, sex]);
 
@@ -84,12 +89,16 @@ export function Patients({
       onAdd(input);
       setBooked(`Contrôle prévu le ${formatWhen(start.toISOString())}.`);
       form.reset();
+      toast.show('Enregistré');
     };
     const other = clashesAt(consults, current.doctorId, input.start);
     if (other) {
       const name = patients.find((item) => item.id === other.patientId)?.name ?? 'Un autre patient';
-      setClash({
+      setAsk({
+        tone: 'edit',
+        title: 'Ce créneau est déjà pris',
         text: `${name} a déjà une consultation à ${formatWhen(other.start)}. Continuer quand même ?`,
+        confirm: 'Continuer quand même',
         run: place,
       });
       return;
@@ -114,7 +123,22 @@ export function Patients({
               const name = String(data.get('name') || '').trim();
               const phone = String(data.get('phone') || '').trim();
               if (!name || !phone) return;
-              const id = onCreate({
+              const twin = findByPhone(patients, phone);
+              if (twin) {
+                setAsk({
+                  tone: 'edit',
+                  title: 'Ce téléphone existe déjà',
+                  text: `${twin.name} a déjà le numéro ${twin.phone}. Ouvrir sa fiche plutôt que d’en créer une autre ?`,
+                  confirm: 'Ouvrir la fiche',
+                  run: () => {
+                    setSelected(twin.id);
+                    setCreating(false);
+                  },
+                });
+                return;
+              }
+              const form = event.currentTarget;
+              const input = {
                 doctorId,
                 name,
                 phone,
@@ -124,10 +148,12 @@ export function Patients({
                 conditions: '',
                 allergies: '',
                 notes: '',
-              });
+              };
+              const id = onCreate(input);
               setSelected(id);
               setCreating(false);
-              event.currentTarget.reset();
+              form.reset();
+              toast.show('Enregistré');
             }}
           >
             <input name="name" required placeholder="Nom" className="h-10 w-full rounded-xl border border-fb-line px-3 text-sm font-semibold" />
@@ -148,7 +174,7 @@ export function Patients({
         <input
           value={query}
           onChange={(event) => setQuery(event.target.value)}
-          placeholder="Nom, maladie, note…"
+          placeholder="Nom, téléphone, maladie…"
           className="h-11 w-full rounded-xl border border-fb-line px-3 text-sm font-semibold outline-none ring-fb focus:ring-2"
         />
         <div className="mt-2 flex gap-2">
@@ -165,17 +191,22 @@ export function Patients({
         </div>
         <ul className="mt-3 max-h-[540px] space-y-1 overflow-auto">
           {rows.map((patient) => (
-            <li key={patient.id}>
+            <li key={patient.id} className="flex items-start gap-1">
               <button
                 type="button"
                 onClick={() => setSelected(patient.id)}
-                className={`w-full rounded-xl px-3 py-2 text-left ${current?.id === patient.id ? 'bg-fb-soft' : 'hover:bg-fb-bg'}`}
+                className={`min-w-0 flex-1 rounded-xl px-3 py-2 text-left ${current?.id === patient.id ? 'bg-fb-soft' : 'hover:bg-fb-bg'}`}
               >
                 <p className="font-bold">{patient.name}</p>
                 <p className="text-xs text-fb-muted">
                   {patient.sex === 'F' ? 'F' : 'H'} · {patient.age} ans · {patient.conditions}
                 </p>
               </button>
+              {onDocument ? (
+                <button type="button" onClick={() => onDocument(patient.id)} className="mt-1 shrink-0 rounded-lg bg-fb-soft px-2 py-2 text-xs font-bold text-fb-deep">
+                  Document
+                </button>
+              ) : null}
             </li>
           ))}
         </ul>
@@ -188,15 +219,38 @@ export function Patients({
           onSubmit={(event) => {
             event.preventDefault();
             const data = new FormData(event.currentTarget);
-            setAskSave({
+            const phone = String(data.get('phone'));
+            const twin = findByPhone(patients, phone, current.id);
+            if (twin) {
+              setAsk({
+                tone: 'edit',
+                title: 'Ce téléphone existe déjà',
+                text: `${twin.name} a déjà le numéro ${twin.phone}. Ouvrir sa fiche ?`,
+                confirm: 'Ouvrir la fiche',
+                run: () => setSelected(twin.id),
+              });
+              return;
+            }
+            const patch = {
               age: Number(data.get('age')) || current.age,
               sex: String(data.get('sex')) as Sex,
-              phone: String(data.get('phone')),
+              phone,
               insurance: String(data.get('insurance')),
               conditions: String(data.get('conditions')),
               allergies: String(data.get('allergies')),
               notes: String(data.get('notes')),
-            });
+            };
+            const previous = {
+              age: current.age,
+              sex: current.sex,
+              phone: current.phone,
+              insurance: current.insurance,
+              conditions: current.conditions,
+              allergies: current.allergies,
+              notes: current.notes,
+            };
+            onPatient(current.id, patch);
+            toast.show('Enregistré', () => onPatient(current.id, previous));
           }}
         >
           <h2 className="text-xl font-bold">{current.name}</h2>
@@ -250,11 +304,23 @@ export function Patients({
                   <p className="text-sm text-fb-muted">
                     {item.reason} · {VISIT_LABEL[item.visitType]} · {PAY_LABEL[payState(item)]} · {dueAmount(item)} DH
                   </p>
+                  {item.tension || item.weight || item.temperature ? (
+                    <p className="mt-1 text-sm text-fb-muted">
+                      {[item.tension ? `TA ${item.tension}` : '', item.weight ? `${item.weight} kg` : '', item.temperature ? `${item.temperature} °C` : ''].filter(Boolean).join(' · ')}
+                    </p>
+                  ) : null}
                   {item.note ? <p className="mt-1 text-sm">{item.note}</p> : null}
                 </li>
               ))}
             </ol>
           </section>
+          {current ? (
+            <PatientDocs
+              patient={current}
+              consults={consults}
+              onOpen={onDocument ? (consultId, kind) => onDocument(current.id, consultId, kind) : undefined}
+            />
+          ) : null}
           <form onSubmit={schedule} className="mt-6 rounded-2xl bg-fb-soft p-4">
             <h3 className="font-bold">Programmer un contrôle</h3>
             <div className="mt-3 grid gap-2 sm:grid-cols-2">
@@ -293,27 +359,15 @@ export function Patients({
         <p className="rounded-2xl bg-white p-8 text-center font-bold ring-1 ring-fb-line">Aucun patient</p>
       )}
       <ConfirmDialog
-        open={Boolean(clash)}
-        tone="edit"
-        title="Ce créneau est déjà pris"
-        text={clash?.text ?? ''}
-        confirmLabel="Continuer quand même"
-        onCancel={() => setClash(null)}
+        open={Boolean(ask)}
+        tone={ask?.tone ?? 'edit'}
+        title={ask?.title ?? ''}
+        text={ask?.text ?? ''}
+        confirmLabel={ask?.confirm ?? 'Confirmer'}
+        onCancel={() => setAsk(null)}
         onConfirm={() => {
-          clash?.run();
-          setClash(null);
-        }}
-      />
-      <ConfirmDialog
-        open={Boolean(askSave && current)}
-        tone="edit"
-        title="Voulez-vous vraiment modifier ?"
-        text={current ? `La fiche de ${current.name} sera mise à jour.` : ''}
-        confirmLabel="Oui, modifier"
-        onCancel={() => setAskSave(null)}
-        onConfirm={() => {
-          if (current && askSave) onPatient(current.id, askSave);
-          setAskSave(null);
+          ask?.run();
+          setAsk(null);
         }}
       />
     </div>

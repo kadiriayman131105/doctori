@@ -3,8 +3,9 @@
 import { FormEvent, useState } from 'react';
 import type { Doctor, Insurance, VisitType } from '@/doctori/types';
 import { VISIT_LABEL } from '@/doctori/data';
-import { initials } from '@/components/doctori/DoctorCard';
+import { initials } from '@/components/doctori/initials';
 import { ConfirmDialog } from './ConfirmDialog';
+import { useToast } from './Toast';
 
 const INSURANCES: Insurance[] = ['CNSS', 'CNOPS', 'Mutuelle'];
 const VISITS: VisitType[] = ['cabinet', 'video', 'domicile'];
@@ -12,7 +13,8 @@ const VISITS: VisitType[] = ['cabinet', 'video', 'domicile'];
 export function ProfileForm({ doctor, onSave }: { doctor: Doctor; onSave: (patch: Partial<Doctor>) => void }) {
   const [photo, setPhoto] = useState(doctor.photo || '');
   const [saved, setSaved] = useState('');
-  const [pending, setPending] = useState<Partial<Doctor> | null>(null);
+  const [dropPhoto, setDropPhoto] = useState(false);
+  const toast = useToast();
 
   function onPhoto(file: File | undefined) {
     if (!file) return;
@@ -30,7 +32,7 @@ export function ProfileForm({ doctor, onSave }: { doctor: Doctor; onSave: (patch
     const data = new FormData(event.currentTarget);
     const insurance = INSURANCES.filter((item) => data.get(`ins-${item}`) === 'on');
     const visitTypes = VISITS.filter((item) => data.get(`visit-${item}`) === 'on');
-    setPending({
+    const patch = {
       name: String(data.get('name') || doctor.name).trim(),
       specialty: String(data.get('specialty') || doctor.specialty).trim(),
       diploma: String(data.get('diploma') || '').trim(),
@@ -50,7 +52,10 @@ export function ProfileForm({ doctor, onSave }: { doctor: Doctor; onSave: (patch
       insurance: insurance.length ? insurance : doctor.insurance,
       visitTypes: visitTypes.length ? visitTypes : doctor.visitTypes,
       photo,
-    });
+    };
+    onSave(patch);
+    toast.show('Enregistré');
+    setSaved('Profil enregistré.');
   }
 
   return (
@@ -70,7 +75,7 @@ export function ProfileForm({ doctor, onSave }: { doctor: Doctor; onSave: (patch
           />
         </label>
         {photo ? (
-          <button type="button" onClick={() => setPhoto('')} className="mt-2 text-sm font-bold text-red-600">
+          <button type="button" onClick={() => setDropPhoto(true)} className="mt-2 text-sm font-bold text-red-600">
             Retirer la photo
           </button>
         ) : null}
@@ -147,16 +152,15 @@ export function ProfileForm({ doctor, onSave }: { doctor: Doctor; onSave: (patch
       </div>
     </form>
     <ConfirmDialog
-      open={Boolean(pending)}
-      tone="edit"
-      title="Voulez-vous vraiment modifier ?"
-      text="Votre photo, diplôme, description et prix seront visibles sur votre carte."
-      confirmLabel="Oui, modifier"
-      onCancel={() => setPending(null)}
+      open={dropPhoto}
+      tone="danger"
+      title="Voulez-vous vraiment supprimer ?"
+      text="La photo sera retirée. Enregistrez le profil pour confirmer."
+      confirmLabel="Oui, retirer"
+      onCancel={() => setDropPhoto(false)}
       onConfirm={() => {
-        if (pending) onSave(pending);
-        setPending(null);
-        setSaved('Profil enregistré. Il apparaît sur votre carte et votre fiche.');
+        setPhoto('');
+        setDropPhoto(false);
       }}
     />
     </>

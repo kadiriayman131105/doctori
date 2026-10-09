@@ -33,6 +33,19 @@ export function sameDay(iso: string, offset = 0) {
   return date.toDateString() === target.toDateString();
 }
 
+export function dayStamp(iso: string) {
+  const date = new Date(iso);
+  const pad = (value: number) => String(value).padStart(2, '0');
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
+}
+
+export function inInterval(iso: string, from: string, to: string) {
+  const day = dayStamp(iso);
+  if (from && day < from) return false;
+  if (to && day > to) return false;
+  return true;
+}
+
 export function inRange(iso: string, range: 'today' | 'week' | 'month' | 'all') {
   if (range === 'all') return true;
   const start = new Date(iso).getTime();

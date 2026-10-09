@@ -16,6 +16,8 @@ interface HoursApi {
   closed: (doctorId: string) => string[];
   saveWeek: (doctorId: string, week: WeekHours) => void;
   toggleClosed: (doctorId: string, day: string) => boolean;
+  closeDays: (doctorIds: string[], days: string[]) => number;
+  saveClosed: (doctorId: string, closed: string[]) => void;
 }
 
 const HoursContext = createContext<HoursApi | null>(null);
@@ -59,6 +61,24 @@ export function HoursProvider({ children }: { children: React.ReactNode }) {
           [doctorId]: { week: current[doctorId]?.week ?? DEFAULT_WEEK, closed },
         }));
         return blocked;
+      },
+      saveClosed: (doctorId, closed) => {
+        setSaved((current) => ({
+          ...current,
+          [doctorId]: { week: current[doctorId]?.week ?? DEFAULT_WEEK, closed },
+        }));
+      },
+      closeDays: (doctorIds, days) => {
+        let added = 0;
+        const next = { ...saved };
+        for (const doctorId of doctorIds) {
+          const previous = saved[doctorId]?.closed ?? [];
+          const closed = Array.from(new Set([...previous, ...days]));
+          added += closed.length - previous.length;
+          next[doctorId] = { week: saved[doctorId]?.week ?? DEFAULT_WEEK, closed };
+        }
+        setSaved(next);
+        return added;
       },
     }),
     [ready, saved],

@@ -3,20 +3,32 @@ import { FLOW_LABEL } from '@/doctori/clinic';
 import { formatWhen } from '@/doctori/slots';
 import { Bars, Donut } from './Charts';
 import { lastDays, moneyOf, sameDay } from './money';
+import { WaitingRoom } from './WaitingRoom';
+import { CabinetBackup } from './CabinetBackup';
+import { DayExport } from './DayExport';
+import { useProfiles } from '@/doctori/profiles';
+import { useClinic } from '@/doctori/clinic-store';
 
 export function Overview({
   consults,
   patients,
   onOpen,
+  onConsult,
+  onOpenPatient,
 }: {
   consults: Consult[];
   patients: ClinicPatient[];
   onOpen: () => void;
+  onConsult: (id: string, patch: Partial<Consult>) => void;
+  onOpenPatient?: (patientId: string) => void;
 }) {
   const money = moneyOf(consults);
+  const clinic = useClinic();
+  const profiles = useProfiles();
+  const doctorName = profiles.doctor(clinic.doctorId || '')?.name;
   const today = consults.filter((item) => sameDay(item.start)).sort((a, b) => +new Date(a.start) - +new Date(b.start));
   const done = consults.filter((item) => item.flow === 'termine').length;
-  const waiting = consults.filter((item) => item.flow === 'a_venir' || item.flow === 'en_cours').length;
+  const waiting = consults.filter((item) => item.flow === 'a_venir' || item.flow === 'arrive' || item.flow === 'en_cours').length;
 
   return (
     <div className="space-y-4">
@@ -35,6 +47,9 @@ export function Overview({
         ))}
       </div>
 
+      <CabinetBackup />
+      <DayExport consults={consults} patients={patients} doctorName={doctorName} />
+      <WaitingRoom consults={consults} patients={patients} onConsult={onConsult} onOpenPatient={onOpenPatient} />
       <div className="grid gap-3 lg:grid-cols-[1.4fr_0.8fr]">
         <section className="rounded-2xl bg-white p-4 ring-1 ring-fb-line">
           <h2 className="font-bold">Encaissements sur 7 jours</h2>

@@ -5,21 +5,19 @@ import { Phone, Send } from 'lucide-react';
 import type { ClinicPatient, Consult } from '@/doctori/types';
 import { useProfiles } from '@/doctori/profiles';
 import { formatLong, formatWhen } from '@/doctori/slots';
-import { whatsAppLink } from '@/doctori/store';
-
-function digits(value: string) {
-  return value.replace(/\D/g, '');
-}
+import { phoneDigits, whatsAppLink } from '@/doctori/phone';
+import { useToast } from './Toast';
 
 export function PhoneDesk({ patients, consults }: { patients: ClinicPatient[]; consults: Consult[] }) {
   const [query, setQuery] = useState('');
   const profiles = useProfiles();
-  const key = digits(query);
+  const toast = useToast();
+  const key = phoneDigits(query);
 
   const matches = useMemo(() => {
     if (key.length < 4) return [];
     return patients.filter((patient) => {
-      const phone = digits(patient.phone);
+      const phone = phoneDigits(patient.phone);
       return phone.includes(key) || key.endsWith(phone.slice(-9));
     });
   }, [key, patients]);
@@ -32,7 +30,7 @@ export function PhoneDesk({ patients, consults }: { patients: ClinicPatient[]; c
         </span>
         <div className="min-w-0 flex-1">
           <h2 className="font-bold">Appel au cabinet</h2>
-          <p className="text-sm text-fb-muted">Le patient n’a pas de compte. Cherchez par numéro, puis renvoyez le rappel.</p>
+          <p className="text-sm text-fb-muted">Cherchez par téléphone, puis ouvrez WhatsApp (gratuit, wa.me).</p>
           <input
             value={query}
             onChange={(event) => setQuery(event.target.value)}
@@ -54,7 +52,7 @@ export function PhoneDesk({ patients, consults }: { patients: ClinicPatient[]; c
             .filter(
               (item) =>
                 item.patientId === patient.id &&
-                (item.flow === 'a_venir' || item.flow === 'en_cours') &&
+                (item.flow === 'a_venir' || item.flow === 'arrive' || item.flow === 'en_cours') &&
                 new Date(item.start).getTime() >= now,
             )
             .sort((a, b) => +new Date(a.start) - +new Date(b.start))[0];
@@ -78,15 +76,17 @@ export function PhoneDesk({ patients, consults }: { patients: ClinicPatient[]; c
                 </p>
               </div>
               {next ? (
-                <a
-                  href={href}
-                  target="_blank"
-                  rel="noreferrer"
+                <button
+                  type="button"
+                  onClick={() => {
+                    window.open(href, '_blank', 'noopener,noreferrer');
+                    toast.show('WhatsApp ouvert');
+                  }}
                   className="inline-flex items-center gap-1 rounded-xl bg-fb-green px-3 py-2 text-sm font-bold text-white"
                 >
                   <Send size={16} />
                   Rappel WhatsApp
-                </a>
+                </button>
               ) : null}
             </li>
           );

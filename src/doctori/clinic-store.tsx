@@ -1,6 +1,6 @@
 'use client';
 
-import { createContext, useContext, useEffect, useMemo, useState } from 'react';
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import type { ClinicPatient, Consult } from './types';
 import { ACCOUNTS, buildClinic } from './clinic';
 
@@ -10,6 +10,7 @@ const DATA = 'doctori-pro-data-v1';
 interface Saved {
   patients: ClinicPatient[];
   consults: Consult[];
+  droppedBookings?: string[];
 }
 
 type Role = 'medecin' | 'secretaire';
@@ -29,12 +30,13 @@ interface ClinicApi {
   logout: () => void;
   updatePatient: (id: string, patch: Partial<ClinicPatient>) => void;
   updateConsult: (id: string, patch: Partial<Consult>) => void;
-  addConsult: (input: Omit<Consult, 'id'>) => void;
+  addConsult: (input: Omit<Consult, 'id'>) => string;
   removeConsult: (id: string) => void;
   addPatient: (input: Omit<ClinicPatient, 'id'>) => string;
   removePatient: (id: string) => void;
   assignPatient: (id: string, doctorId: string) => void;
   switchView: () => void;
+  droppedBookings: string[];
 }
 
 const ClinicContext = createContext<ClinicApi | null>(null);
@@ -45,6 +47,15 @@ export function ClinicProvider({ children }: { children: React.ReactNode }) {
   const [doctorId, setDoctorId] = useState<string | null>(null);
   const [patients, setPatients] = useState<ClinicPatient[]>([]);
   const [consults, setConsults] = useState<Consult[]>([]);
+  const [droppedBookings, setDroppedBookings] = useState<string[]>([]);
+  const bag = useRef({ patients, consults, droppedBookings });
+  bag.current = { patients, consults, droppedBookings };
+
+  const rememberDropped = useCallback((ids: string[]) => {
+    const fresh = ids.filter(Boolean);
+    if (!fresh.length) return;
+    setDroppedBookings((current) => [...new Set([...current, ...fresh])]);
+  }, []);
 
   useEffect(() => {
     const seed = buildClinic();
@@ -54,6 +65,7 @@ export function ClinicProvider({ children }: { children: React.ReactNode }) {
         const saved = JSON.parse(raw) as Saved;
         setPatients(saved.patients?.length ? saved.patients : seed.patients);
         setConsults(saved.consults?.length ? saved.consults : seed.consults);
+        setDroppedBookings(saved.droppedBookings ?? []);
       } else {
         setPatients(seed.patients);
         setConsults(seed.consults);
@@ -80,8 +92,8 @@ export function ClinicProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     if (!ready) return;
-    localStorage.setItem(DATA, JSON.stringify({ patients, consults }));
-  }, [patients, consults, ready]);
+    localStorage.setItem(DATA, JSON.stringify({ patients, consults, droppedBookings }));
+  }, [patients, consults, droppedBookings, ready]);
 
   const value = useMemo<ClinicApi>(
     () => ({
@@ -110,7 +122,7 @@ export function ClinicProvider({ children }: { children: React.ReactNode }) {
         setRole((current) => {
           const next = current === 'secretaire' ? 'medecin' : 'secretaire';
           setDoctorId((currentId) => {
-            const nextId = next === 'medecin' ? currentId || 'amal-bennani' : currentId;
+            const nextId = currentId || 'amal-bennani';
             localStorage.setItem(SESSION, JSON.stringify({ role: next, doctorId: nextId }));
             return nextId;
           });
@@ -124,9 +136,13 @@ export function ClinicProvider({ children }: { children: React.ReactNode }) {
         setConsults((current) => current.map((item) => (item.id === id ? { ...item, ...patch } : item)));
       },
       addConsult: (input) => {
-        setConsults((current) => [{ ...input, id: `c-${Date.now()}` }, ...current]);
+        const id = `c-${Date.now()}`;
+        setConsults((current) => [{ ...input, id }, ...current]);
+        return id;
       },
       removeConsult: (id) => {
+        const gone = bag.current.consults.find((item) => item.id === id);
+        if (gone?.bookingId) rememberDropped([gone.bookingId]);
         setConsults((current) => current.filter((item) => item.id !== id));
       },
       addPatient: (input) => {
@@ -135,19 +151,23 @@ export function ClinicProvider({ children }: { children: React.ReactNode }) {
         return id;
       },
       removePatient: (id) => {
+        rememberDropped(bag.current.consults.filter((item) => item.patientId === id && item.bookingId).map((item) => item.bookingId as string));
         setPatients((current) => current.filter((item) => item.id !== id));
         setConsults((current) => current.filter((item) => item.patientId !== id));
       },
+      droppedBookings,
       assignPatient: (id, nextDoctorId) => {
         setPatients((current) => current.map((item) => (item.id === id ? { ...item, doctorId: nextDoctorId } : item)));
         setConsults((current) =>
           current.map((item) =>
-            item.patientId === id && item.flow === 'a_venir' ? { ...item, doctorId: nextDoctorId } : item,
+            item.patientId === id && (item.flow === 'a_venir' || item.flow === 'arrive')
+              ? { ...item, doctorId: nextDoctorId }
+              : item,
           ),
         );
       },
     }),
-    [ready, role, doctorId, patients, consults],
+    [ready, role, doctorId, patients, consults, droppedBookings, rememberDropped],
   );
 
   return <ClinicContext.Provider value={value}>{children}</ClinicContext.Provider>;
